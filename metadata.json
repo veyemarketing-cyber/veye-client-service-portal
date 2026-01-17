@@ -1,0 +1,5 @@
+{
+  "name": "Veye Client Service Portal",
+  "description": "A secure internal operational portal for Veye Media clients to submit and manage service requests, track ticket status, and communicate with support teams.",
+  "requestFramePermissions": []
+}
