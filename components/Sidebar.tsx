@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { User, UserRole } from '../types';
 import InstallPWA from './InstallPWA';
@@ -15,25 +14,39 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, onLogout, onNavigate, cu
     <div className="w-64 bg-slate-900 text-white flex flex-col h-full border-r border-slate-800">
       <div className="p-6 flex flex-col space-y-1 border-b border-slate-800">
         <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-          <span className="bg-blue-600 p-1.5 rounded">VM</span>
+          {/* Logo */}
+          <span className="bg-blue-600 p-1.5 rounded inline-flex items-center justify-center">
+            <img
+              src="/images/veye-logo.png"
+              alt="Veye"
+              className="h-6 w-6 object-contain"
+              draggable={false}
+            />
+          </span>
           Veye Portal
         </h1>
         <p className="text-slate-400 text-xs mt-1 uppercase tracking-widest font-semibold">Client Service</p>
       </div>
-      
+
       <nav className="flex-1 p-4 space-y-2">
-        <button 
+        <button
           onClick={() => onNavigate('dashboard')}
           className={`w-full text-left px-4 py-3 rounded-lg transition-colors flex items-center gap-3 ${
             currentPath === 'dashboard' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-300'
           }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+            />
           </svg>
           Dashboard
         </button>
-        <button 
+
+        <button
           onClick={() => onNavigate('new-ticket')}
           className={`w-full text-left px-4 py-3 rounded-lg transition-colors flex items-center gap-3 ${
             currentPath === 'new-ticket' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-300'
@@ -60,12 +73,18 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, onLogout, onNavigate, cu
             <span className="text-xs text-slate-400 truncate">{currentUser.companyName}</span>
           </div>
         </div>
-        <button 
+
+        <button
           onClick={onLogout}
           className="w-full text-left px-4 py-2 text-sm rounded-lg hover:bg-red-900/30 hover:text-red-400 text-slate-400 transition-colors flex items-center gap-3"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+            />
           </svg>
           Sign Out
         </button>
