@@ -95,13 +95,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       <p style="white-space: pre-wrap;">${escapeHtml(cleanMsg)}</p>
     `;
 
-    const info = await transporter.sendMail({
-      from: `Veye Portal <${SMTP_USER}>`,
-      to: TO_EMAIL,
-      replyTo: cleanEmail,
-      subject: `[${priority}] Service Request: ${cleanOrg}`,
-      html,
-    });
+   const info = await transporter.sendMail({
+  from: "Veye Portal <portal@veyemedia.co>",   // visible sender
+  sender: SMTP_USER,                          // authenticating account (victor)
+  to: TO_EMAIL,
+  replyTo: cleanEmail,
+  subject: `[${priority}] Service Request: ${cleanOrg}`,
+  html,
+});
+
 
     return res.status(200).json({
       ok: true,
