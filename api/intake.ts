@@ -1,6 +1,8 @@
 /**
  * Veye Media Intake API (Google Workspace SMTP, email-only)
  * Endpoint: /api/intake
+ *
+ * Authenticates via SMTP_USER (victor@veyemedia.co) and presents mail "From" as portal@ alias.
  */
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
@@ -8,12 +10,18 @@ import nodemailer from "nodemailer";
 
 export const config = { maxDuration: 10 };
 
-// If you want strict CORS, keep your allowlist.
-// If your portal and API are same-origin, you can remove CORS entirely.
+// Update this to your actual portal domain(s) as needed.
 const ALLOWED_ORIGINS = new Set<string>([
   "https://www.veyemedia.co",
-  "https://veye-portal.vercel.app", // replace with your real domain if different
+  "https://veye-client-service-portal-1szn3.vercel.app", // <-- replace with your real deployed portal URL
 ]);
+
+const DEFAULT_TO = "victor@veyemedia.co";
+const DEFAULT_HOST = "smtp.gmail.com";
+const DEFAULT_PORT = 587;
+
+// Visible sender (alias). This does NOT need to authenticate.
+const MAIL_FROM = "Veye Portal <portal@veyemedia.co>";
 
 function setCors(req: VercelRequest, res: VercelResponse) {
   const origin = req.headers.origin;
@@ -24,7 +32,8 @@ function setCors(req: VercelRequest, res: VercelResponse) {
   }
 
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Max-Age", "86400");
 }
 
 function escapeHtml(input: unknown) {
@@ -40,30 +49,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res);
 
   if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "POST") return res.status(405).json({ ok: false, message: "Method not allowed" });
+  if (req.method !== "POST") return res.status(405).json({ ok: false, message: "Method Not Allowed" });
 
-  // Required SMTP env vars
-  const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
-  const SMTP_PORT = Number(process.env.SMTP_PORT || "587");
-  const SMTP_USER = process.env.SMTP_USER; // victor@veyemedia.co
-  const SMTP_PASS = process.env.SMTP_PASS; // Google App Password
-  const TO_EMAIL = process.env.CONTACT_TO_EMAIL || "victor@veyemedia.co";
+  const SMTP_HOST = process.env.SMTP_HOST || DEFAULT_HOST;
+  const SMTP_PORT = Number(process.env.SMTP_PORT || DEFAULT_PORT);
+  const SMTP_USER = process.env.SMTP_USER; // victor@veyemedia.co (auth account)
+  const SMTP_PASS = process.env.SMTP_PASS; // app password for SMTP_USER
+  const TO_EMAIL = process.env.CONTACT_TO_EMAIL || DEFAULT_TO;
 
   if (!SMTP_USER || !SMTP_PASS) {
-    return res.status(500).json({ ok: false, message: "Missing SMTP_USER or SMTP_PASS" });
+    return res.status(500).json({
+      ok: false,
+      message: "Missing SMTP_USER or SMTP_PASS in environment variables.",
+    });
   }
 
   try {
-    const payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-
+    // IMPORTANT: Use req.body directly (Vercel parses JSON for you in most cases)
     const {
       fullName,
-      organization, // matches your original intake fields
+      organization,
       email,
       message,
       priority = "Normal",
       deadline = "Not specified",
-    } = payload ?? {};
+    } = (req.body || {}) as Record<string, unknown>;
 
     if (!fullName || !organization || !email || !message) {
       return res.status(400).json({
@@ -82,7 +92,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       port: SMTP_PORT,
       secure: SMTP_PORT === 465, // 465 = SSL, 587 = STARTTLS
       auth: { user: SMTP_USER, pass: SMTP_PASS },
+      // Helps fail fast instead of hanging
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
     });
+
+    // Optional but useful: confirms auth/connection early (helps debugging)
+    await transporter.verify();
 
     const html = `
       <h2>New Service Request</h2>
@@ -95,15 +112,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       <p style="white-space: pre-wrap;">${escapeHtml(cleanMsg)}</p>
     `;
 
-   const info = await transporter.sendMail({
-  from: "Veye Portal <portal@veyemedia.co>",   // visible sender
-  sender: SMTP_USER,                          // authenticating account (victor)
-  to: TO_EMAIL,
-  replyTo: cleanEmail,
-  subject: `[${priority}] Service Request: ${cleanOrg}`,
-  html,
-});
-
+    const info = await transporter.sendMail({
+      from: MAIL_FROM,     // visible sender
+      sender: SMTP_USER,   // authenticating account
+      to: TO_EMAIL,
+      replyTo: cleanEmail,
+      subject: `[${String(priority)}] Service Request: ${cleanOrg}`,
+      html,
+    });
 
     return res.status(200).json({
       ok: true,
@@ -116,6 +132,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ok: false,
       message: "SMTP send failed",
       error: err?.message || String(err),
+      code: err?.code,
+      responseCode: err?.responseCode,
     });
   }
 }
