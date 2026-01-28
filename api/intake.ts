@@ -10,10 +10,9 @@ import nodemailer from "nodemailer";
 
 export const config = { maxDuration: 10 };
 
-// Update this to your actual portal domain(s) as needed.
 const ALLOWED_ORIGINS = new Set<string>([
   "https://www.veyemedia.co",
-  "https://veye-client-service-portal-1szn3.vercel.app", // <-- replace with your real deployed portal URL
+  "https://veye-client-service-portal-1szn3.vercel.app", // replace with your real deployed portal URL
 ]);
 
 const DEFAULT_TO = "victor@veyemedia.co";
@@ -49,7 +48,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res);
 
   if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "POST") return res.status(405).json({ ok: false, message: "Method Not Allowed" });
+  if (req.method !== "POST") {
+    return res.status(405).json({ ok: false, message: "Method Not Allowed" });
+  }
 
   const SMTP_HOST = process.env.SMTP_HOST || DEFAULT_HOST;
   const SMTP_PORT = Number(process.env.SMTP_PORT || DEFAULT_PORT);
@@ -65,7 +66,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // IMPORTANT: Use req.body directly (Vercel parses JSON for you in most cases)
+    console.log("INTAKE: reached handler", {
+      method: req.method,
+      origin: req.headers.origin,
+      hasBody: !!req.body,
+    });
+
+    // IMPORTANT: Use req.body directly
     const {
       fullName,
       organization,
@@ -74,6 +81,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       priority = "Normal",
       deadline = "Not specified",
     } = (req.body || {}) as Record<string, unknown>;
+
+    console.log("INTAKE: body keys", req.body ? Object.keys(req.body) : null);
 
     if (!fullName || !organization || !email || !message) {
       return res.status(400).json({
@@ -92,14 +101,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       port: SMTP_PORT,
       secure: SMTP_PORT === 465, // 465 = SSL, 587 = STARTTLS
       auth: { user: SMTP_USER, pass: SMTP_PASS },
-      // Helps fail fast instead of hanging
       connectionTimeout: 10_000,
       greetingTimeout: 10_000,
       socketTimeout: 15_000,
     });
 
-    // Optional but useful: confirms auth/connection early (helps debugging)
+    console.log("INTAKE: verifying SMTP", { SMTP_HOST, SMTP_PORT, SMTP_USER, TO_EMAIL });
     await transporter.verify();
+    console.log("INTAKE: SMTP verified");
 
     const html = `
       <h2>New Service Request</h2>
@@ -112,14 +121,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       <p style="white-space: pre-wrap;">${escapeHtml(cleanMsg)}</p>
     `;
 
+    console.log("INTAKE: about to sendMail");
     const info = await transporter.sendMail({
-      from: MAIL_FROM,     // visible sender
-      sender: SMTP_USER,   // authenticating account
+      from: MAIL_FROM, // visible sender (alias)
+      sender: SMTP_USER, // authenticating account
       to: TO_EMAIL,
       replyTo: cleanEmail,
       subject: `[${String(priority)}] Service Request: ${cleanOrg}`,
       html,
     });
+
+    console.log("INTAKE: sendMail result", {
+      messageId: info.messageId,
+      accepted: info.accepted,
+      rejected: info.rejected,
+      response: info.response,
+    });
+
+    // Hard fail unless Gmail accepted at least one recipient
+    if (!info.accepted || info.accepted.length === 0) {
+      return res.status(502).json({
+        ok: false,
+        message: "SMTP send returned no accepted recipients.",
+        accepted: info.accepted,
+        rejected: info.rejected,
+        response: info.response,
+      });
+    }
 
     return res.status(200).json({
       ok: true,
